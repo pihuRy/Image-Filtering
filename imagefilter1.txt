@@ -1,0 +1,253 @@
+import numpy as np
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+import matplotlib.image as mpimg
+
+
+img = mpimg.imread('/content/CATTO.png')
+#Display the image
+plt.imshow(img, cmap='gray')
+plt.axis('off')
+plt.show()
+
+img
+
+img.shape
+
+from PIL import Image, ImageDraw
+
+
+input_image = Image.open("/content/CATTO.png")
+input_pixels = input_image.load()
+
+
+box_kernel = [[1 / 9, 1 / 9, 1 / 9],
+              [1 / 9, 1 / 9, 1 / 9],
+              [1 / 9, 1 / 9, 1 / 9]]
+
+gaussian_kernel = [[1 / 256, 4  / 256,  6 / 256,  4 / 256, 1 / 256],
+                   [4 / 256, 16 / 256, 24 / 256, 16 / 256, 4 / 256],
+                   [6 / 256, 24 / 256, 36 / 256, 24 / 256, 6 / 256],
+                   [4 / 256, 16 / 256, 24 / 256, 16 / 256, 4 / 256],
+                   [1 / 256, 4  / 256,  6 / 256,  4 / 256, 1 / 256]]
+
+
+kernel = box_kernel
+
+
+offset = len(kernel) // 2
+
+
+output_image = Image.new("RGB", input_image.size)
+draw = ImageDraw.Draw(output_image)
+
+
+for x in range(offset, input_image.width - offset):
+    for y in range(offset, input_image.height - offset):
+        acc = [0, 0, 0]
+        for a in range(len(kernel)):
+            for b in range(len(kernel)):
+                xn = x + a - offset
+                yn = y + b - offset
+                pixel = input_pixels[xn, yn]
+                acc[0] += pixel[0] * kernel[a][b]
+                acc[1] += pixel[1] * kernel[a][b]
+                acc[2] += pixel[2] * kernel[a][b]
+
+            draw.point((x, y), (int(acc[0]), int(acc[1]), int(acc[2])))
+
+output_image.save("/content/output.png")
+
+
+from matplotlib import pyplot as plt
+plt.imshow(output_image, interpolation='nearest')
+plt.savefig("/content/output.png")
+plt.show()
+
+
+import cv2
+import matplotlib.pyplot as plt
+%matplotlib inline
+# Read the original image
+img = cv2.imread('/content/output.png')
+# converting because opencv uses BGR as default
+RGB_img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+plt.imshow(RGB_img)
+
+gray = cv2.cvtColor(RGB_img, cv2.COLOR_BGR2GRAY)
+# remove noise
+img = cv2.GaussianBlur(gray,(3,3),0)
+# convolute with sobel kernels
+sobelx = cv2.Sobel(img,cv2.CV_64F,1,0,ksize=5)  # x
+sobely = cv2.Sobel(img,cv2.CV_64F,0,1,ksize=5)  # y
+plt.imshow(sobely)
+plt.title("Sobel-y edge detection")
+
+gray = cv2.cvtColor(RGB_img, cv2.COLOR_BGR2GRAY)
+# remove noise
+img = cv2.GaussianBlur(gray,(3,3),0)
+# convolute with sobel kernels
+sobelx = cv2.Sobel(img,cv2.CV_64F,1,0,ksize=5)  # x
+sobely = cv2.Sobel(img,cv2.CV_64F,0,1,ksize=5)  # y
+#Plotting images
+plt.imshow(sobelx)
+plt.title("Sobel-x edge detection")
+
+
+import numpy as np
+import os
+import cv2
+import matplotlib.pyplot as plt
+
+
+# defining the canny detector function
+
+# here weak_th and strong_th are thresholds for
+# double thresholding step
+def Canny_detector(img, weak_th = None, strong_th = None):
+
+	# conversion of image to grayscale
+	img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+	# Noise reduction step
+	img = cv2.GaussianBlur(img, (5, 5), 1.4)
+
+	# Calculating the gradients
+	gx = cv2.Sobel(np.float32(img), cv2.CV_64F, 1, 0, 3)
+	gy = cv2.Sobel(np.float32(img), cv2.CV_64F, 0, 1, 3)
+
+	# Conversion of Cartesian coordinates to polar
+	mag, ang = cv2.cartToPolar(gx, gy, angleInDegrees = True)
+
+	# setting the minimum and maximum thresholds
+	# for double thresholding
+	mag_max = np.max(mag)
+	if not weak_th:weak_th = mag_max * 0.1
+	if not strong_th:strong_th = mag_max * 0.5
+
+	# getting the dimensions of the input image
+	height, width = img.shape
+
+	# Looping through every pixel of the grayscale
+	# image
+	for i_x in range(width):
+		for i_y in range(height):
+
+			grad_ang = ang[i_y, i_x]
+			grad_ang = abs(grad_ang-180) if abs(grad_ang)>180 else abs(grad_ang)
+
+			# selecting the neighbours of the target pixel
+			# according to the gradient direction
+			# In the x axis direction
+			if grad_ang<= 22.5:
+				neighb_1_x, neighb_1_y = i_x-1, i_y
+				neighb_2_x, neighb_2_y = i_x + 1, i_y
+
+			# top right (diagonal-1) direction
+			elif grad_ang>22.5 and grad_ang<=(22.5 + 45):
+				neighb_1_x, neighb_1_y = i_x-1, i_y-1
+				neighb_2_x, neighb_2_y = i_x + 1, i_y + 1
+
+			# In y-axis direction
+			elif grad_ang>(22.5 + 45) and grad_ang<=(22.5 + 90):
+				neighb_1_x, neighb_1_y = i_x, i_y-1
+				neighb_2_x, neighb_2_y = i_x, i_y + 1
+
+			# top left (diagonal-2) direction
+			elif grad_ang>(22.5 + 90) and grad_ang<=(22.5 + 135):
+				neighb_1_x, neighb_1_y = i_x-1, i_y + 1
+				neighb_2_x, neighb_2_y = i_x + 1, i_y-1
+
+			# Now it restarts the cycle
+			elif grad_ang>(22.5 + 135) and grad_ang<=(22.5 + 180):
+				neighb_1_x, neighb_1_y = i_x-1, i_y
+				neighb_2_x, neighb_2_y = i_x + 1, i_y
+
+			# Non-maximum suppression step
+			if width>neighb_1_x>= 0 and height>neighb_1_y>= 0:
+				if mag[i_y, i_x]<mag[neighb_1_y, neighb_1_x]:
+					mag[i_y, i_x]= 0
+					continue
+
+			if width>neighb_2_x>= 0 and height>neighb_2_y>= 0:
+				if mag[i_y, i_x]<mag[neighb_2_y, neighb_2_x]:
+					mag[i_y, i_x]= 0
+
+	weak_ids = np.zeros_like(img)
+	strong_ids = np.zeros_like(img)
+	ids = np.zeros_like(img)
+
+	# double thresholding step
+	for i_x in range(width):
+		for i_y in range(height):
+
+			grad_mag = mag[i_y, i_x]
+
+			if grad_mag<weak_th:
+				mag[i_y, i_x]= 0
+			elif strong_th>grad_mag>= weak_th:
+				ids[i_y, i_x]= 1
+			else:
+				ids[i_y, i_x]= 2
+
+
+	# finally returning the magnitude of
+	# gradients of edges
+	return mag
+
+frame = cv2.imread('/content/output.png')
+
+# calling the designed function for
+# finding edges
+canny_img = Canny_detector(frame)
+
+# Displaying the input and output image
+plt.figure()
+f, plots = plt.subplots(2, 1)
+plots[0].imshow(frame)
+plots[1].imshow(canny_img)
+
+
+
+import numpy as np
+import cv2
+import matplotlib.pyplot as plt
+
+def prewitt_filter(image):
+    # Define Prewitt filters for horizontal and vertical edges
+    kernel_x = np.array([[-1, 0, 1],
+                        [-1, 0, 1],
+                        [-1, 0, 1]])
+
+    kernel_y = np.array([[-1, -1, -1],
+                        [0, 0, 0],
+                        [1, 1, 1]])
+
+    # Convolve the image with the Prewitt filters
+    edges_x = cv2.filter2D(image, -1, kernel_x)
+    edges_y = cv2.filter2D(image, -1, kernel_y)
+
+    # Combine the horizontal and vertical edges
+    edges = np.sqrt(np.square(edges_x) + np.square(edges_y))
+
+    return edges
+
+# Read the input image
+image = cv2.imread('/content/output.png', cv2.IMREAD_GRAYSCALE)
+
+# Apply the Prewitt filter
+edges = prewitt_filter(image)
+
+# Display the original and filtered images
+plt.figure(figsize=(10, 5))
+plt.subplot(1, 2, 1), plt.imshow(image, cmap='gray')
+plt.title('Original Image'), plt.xticks([]), plt.yticks([])
+plt.subplot(1, 2, 2), plt.imshow(edges, cmap='gray')
+plt.title('Prewitt Filtered Image'), plt.xticks([]), plt.yticks([])
+
+plt.show()
+
+
+
+
